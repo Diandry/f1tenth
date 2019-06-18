@@ -59,7 +59,14 @@ def filter_array(arr, threshold):
             angle = 0  # continue driving straight
 
     print 'max distance at angle: ', angle * 180 / np.pi, ",index: ", max_index, ", distance: ", trimmed_arr[max_index]
-    return angle
+    return trimmed_arr[max_index], angle
+
+
+def find_velocity(distance):
+    if distance >= 10:
+        return 4
+    else:
+        return distance / 5
 
 
 # function returns the number of samples within half the width of the car to account for the car's size
@@ -74,13 +81,14 @@ def find_number_of_samples(car_width, len):
 
 def callback(msg):
     arr = np.array(msg.ranges)
-    angle = filter_array(arr, 0.3)
+    dist, angle = filter_array(arr, 0.3)
+    vel = find_velocity(dist)
     if angle > np.pi / 4:
         angle = np.pi / 4
     if angle < -1 * np.pi / 4:
         angle = np.pi / 4 * -1
 
-    message = drive_param(velocity=1, angle=angle)
+    message = drive_param(velocity=vel, angle=angle)
     pub = rospy.Publisher('/drive_parameters', drive_param, queue_size=10)
     pub.publish(message)
 
