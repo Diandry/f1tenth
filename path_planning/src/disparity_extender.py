@@ -21,9 +21,9 @@ def filter_array(arr, threshold):
             # print "Found disparity. Curr: {0}, next {1}".format(trimmed_arr[i], trimmed_arr[i + 1])
             # overwrite the points after the disparity
             new_length = trimmed_arr[i]
-            margin = find_number_of_samples(0.4, new_length)  # number of samples around the safe zone
+            # margin = find_number_of_samples(0.4, new_length)  # number of samples around the safe zone
             # The above is probably overkill and a simple fixed value might be all I need
-            # margin = 250
+            margin = 50
             for j in range(0, margin):
                 # the number of sample that need to be replaced
                 if i + j < len(trimmed_arr) and trimmed_arr[i + j] > new_length:
@@ -75,6 +75,11 @@ def find_number_of_samples(car_width, len):
 def callback(msg):
     arr = np.array(msg.ranges)
     angle = filter_array(arr, 0.3)
+    if angle > np.pi / 4:
+        angle = np.pi / 4
+    if angle < -1 * np.pi / 4:
+        angle = np.pi / 4 * -1
+
     message = drive_param(velocity=1, angle=angle)
     pub = rospy.Publisher('/drive_parameters', drive_param, queue_size=10)
     pub.publish(message)
