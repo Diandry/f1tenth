@@ -1,0 +1,6 @@
+<launch>
+    <arg name="map_file" default="$(find    race)/maps/porto_track.yaml"/>
+    <node name="map_server" pkg="map_server" type="map_server" args="$(arg    map_file)"/>
+
+    <include file="$(find particle_filter)/launch/localize.launch"/>
+</launch>

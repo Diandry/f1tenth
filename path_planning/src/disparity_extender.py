@@ -4,6 +4,8 @@ import numpy as np
 import numpy.ma as ma
 from sensor_msgs.msg import LaserScan
 from path_planning.msg import drive_param
+from ackermann_msgs.msg import AckermannDrive
+
 import matplotlib.pyplot as plt
 
 
@@ -11,25 +13,27 @@ def filter_array(arr, threshold):
     # trim end elements from array. Ranges outside of -90 to 90 degrees. This assumes a 270 degree lidar sweep
     num = int(len(arr) / 6)  # samples to remove from both sides
     trimmed_arr = arr[num: -num]
-    SAFETY_FACTOR = 0.4  # distance to avoid collision between sides of the car and  walls
+    SAFETY_FACTOR = 0.6  # distance to avoid collision between sides of the car and  walls
     # plt.subplot(1, 2, 1)
     # plt.plot(arr)
 
     i = 0
-    while i < len(trimmed_arr) - 1:
-        if trimmed_arr[i + 1] - trimmed_arr[i] >= threshold:
-            # print "Found disparity. Curr: {0}, next {1}".format(trimmed_arr[i], trimmed_arr[i + 1])
+    while i < len(arr) - 1:
+        if abs(arr[i + 1] - arr[i]) >= threshold:
             # overwrite the points after the disparity
-            new_length = trimmed_arr[i]
+            new_length = arr[i] if arr[i] < arr[i + 1] else arr[i + 1]
+
             # margin = find_number_of_samples(0.4, new_length)  # number of samples around the safe zone
-            # The above is probably overkill and a simple fixed value might be all I need
-            margin = 50
+            # margin = 3
+            margin = 100
+            # this code still includes some unreachable paths in the filtered array
             for j in range(0, margin):
                 # the number of sample that need to be replaced
-                if i + j < len(trimmed_arr) and trimmed_arr[i + j] > new_length:
-                    trimmed_arr[i + j] = new_length
+                if i + j < len(arr) and arr[i + j] > new_length:
+                    arr[i + j] = new_length
             i = i + margin
-        i = i + 1
+        else:
+            i = i + 1
 
     '''Matplotlib was used for debugging and testing'''
     # plt.subplot(1, 2, 2)
@@ -58,15 +62,17 @@ def filter_array(arr, threshold):
         else:
             angle = 0  # continue driving straight
 
-    print 'max distance at angle: ', angle * 180 / np.pi, ",index: ", max_index, ", distance: ", trimmed_arr[max_index]
+    # print 'max distance at angle: ', angle * 180 / np.pi, ",index: ", max_index, ", distance: ", trimmed_arr[max_index]
     return trimmed_arr[max_index], angle
 
 
 def find_velocity(distance):
+    if distance < 0.4:
+        return 0
     if distance >= 10:
-        return 4
+        return 2.5
     else:
-        return distance / 5
+        return distance / 4
 
 
 # function returns the number of samples within half the width of the car to account for the car's size
@@ -81,7 +87,7 @@ def find_number_of_samples(car_width, len):
 
 def callback(msg):
     arr = np.array(msg.ranges)
-    dist, angle = filter_array(arr, 0.3)
+    dist, angle = filter_array(arr, 0.2)
     vel = find_velocity(dist)
     if angle > np.pi / 4:
         angle = np.pi / 4
@@ -92,8 +98,18 @@ def callback(msg):
     pub = rospy.Publisher('/drive_parameters', drive_param, queue_size=10)
     pub.publish(message)
 
+    # message = drive_param(velocity=0.5, angle=0)
+    # pub = rospy.Publisher('/drive_parameters', drive_param, queue_size=10)
+    # pub.publish(message)
 
-rospy.init_node('scan_values')
+    # message = AckermannDrive(speed=3, acceleration=2)
+    # print "car driving"
+    # pub = rospy.Publisher('/vesc/ackermann_cmd_mux/input/teleop', AckermannDrive, queue_size=10)
+    # pub.publish(message)
+
+
+rospy.init_node('disparity_extender')
+rospy.sleep(20.0)
 sub = rospy.Subscriber('/scan', LaserScan, callback)
 rospy.sleep(0.1)
 rospy.spin()
