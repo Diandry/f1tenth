@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 import rospy
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
-import std_msgs.msg
+from std_msgs.msg import Float32, Header
 import time
 
 '''This node was written in a futile attempt to control the acceleration of the car. As far as I can tell,
@@ -17,7 +17,8 @@ class DriveNode:
         # safer way, publish to input/teleop. The deadman switch still works
         self.drive_pub = rospy.Publisher('vesc/low_level/ackermann_cmd_mux/input/teleop', AckermannDriveStamped,
                                          queue_size=10)
-        self.accel_sub = rospy.Subscriber('acceleration', std_msgs.msg.Float32, self.accel_callback)
+        self.vel_pub = rospy.Publisher('current_velocity', Float32, queue_size=5)
+        self.accel_sub = rospy.Subscriber('acceleration', Float32, self.accel_callback)
         self.rate = rospy.Rate(10)
         self.dt = 0.1
         while not rospy.is_shutdown():
@@ -28,7 +29,7 @@ class DriveNode:
         if self.velocity <= 0 and self.acceleration <= 0:  # we don't want the car to go backwards
             self.velocity = 0
         else:
-            print "Acceleeration", self.acceleration
+            print "Acceleration", self.acceleration
             self.velocity = self.velocity + self.dt * self.acceleration
 
     def accel_callback(self, msg):
@@ -36,12 +37,13 @@ class DriveNode:
 
     def drive_car(self):
 
-        msg_header = std_msgs.msg.Header()
+        msg_header = Header()
         ackermann_drive = AckermannDrive(acceleration=self.acceleration, speed=self.velocity)
         msg_header.stamp = rospy.Time.now()
         drive_msg = AckermannDriveStamped(header=msg_header, drive=ackermann_drive)
         self.step_acceleration()
         self.drive_pub.publish(drive_msg)
+        self.vel_pub.publish(self.velocity)
         self.rate.sleep()
 
 
